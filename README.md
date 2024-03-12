@@ -16,8 +16,6 @@ This project allows you to use any mobile device to scan objects and generate ST
 - Open3D
 - Glob
 
-## App
-https://github.com/ayush-beniwal/cad_scanner
 
 ## Installation
 

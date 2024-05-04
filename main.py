@@ -4,10 +4,23 @@ import math
 import os
 import glob
 import open3d as o3d
-import backend
-import calibration
+from scipy.stats import mode
 from rembg import remove
+import numpy as np
 
+
+def filter_3d_coordinates(points, error):
+    # Calculate the mode for each dimension
+    mode_z = mode(points[:, 2]).mode
+
+    # Filter points within the specified range of the mode
+    filtered_points = []
+    for point in points:
+        x, y, z = point
+        if abs(z - mode_z) <= error:
+            filtered_points.append(point)
+
+    return np.array(filtered_points)
 
 def read_images(folder_path):
     print("Reading images")
@@ -24,11 +37,15 @@ def read_images_removebg(folder_path):
     images = []
     extensions = ['png', 'jpg', 'jpeg']
     file_list = sorted([file for ext in extensions for file in glob.glob(os.path.join(folder_path, f'*.{ext}'))]) 
+    cnt = 1
     for file_path in file_list:
+        print("Image",cnt)
         img = cv2.imread(file_path)
+        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
         output = remove(img)
         img = cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
         images.append(img)
+        cnt+=1
     print("Finished!")
     return images
 
@@ -36,10 +53,12 @@ def calculate_dense_optical_flow(prev_frame, current_frame):
     flow = cv2.calcOpticalFlowFarneback(prev_frame, current_frame, None, 0.5, 3, 15, 3, 5, 1.2, 0)
     return flow
 
-def get_depth_data(images,baseline,focal_length):
+def focal_length_in_mm(focal_length_pixels, sensor_size_mm, sensor_resolution_pixels):
+    return (focal_length_pixels * sensor_size_mm) / sensor_resolution_pixels
+
+def get_depth_data(images,baseline,focal_length,pixel_to_millimeter):
     print("Starting process to get depth data :)")
     point_3d_not_rotated = []
-    height, width = images[0].shape
     for i in range(len(images)):
         print("Image",i+1)
         frame1 = images[i]
@@ -48,30 +67,26 @@ def get_depth_data(images,baseline,focal_length):
         else:
             frame2 = images[i+1]
 
-        optical_flow = calculate_dense_optical_flow(frame1, frame2)
+        optical_flow = calculate_dense_optical_flow(frame1, frame2)  
+
         h, w = optical_flow.shape[:2]
-        step = 2
+        step = 5
         depthData = []
         for y in range(0, h, step):
             for x in range(0, w, step):
                 dx, dy = optical_flow[y, x]
                 p = math.sqrt(dx**2 + dy**2)
                 if(p!=0):
-                    z = baseline*focal_length / p
-                    pixel_to_meter = 1000
-                    resolution = height/width
-                    if(z<5000):
-                        depthData.append([[x,y*resolution,z/pixel_to_meter]])
-        # for i in range(len(depthData)):
-        #     cv2.circle(frame1,(int(depthData[i][0][0]),int(depthData[i][0][1])), 5, (255, 255, 255), 5)
-        # cv2.imshow("p",frame1)
-        # cv2.waitKey(0)
+                    z = baseline*focal_length / p*pixel_to_millimeter   # Triangulation
+                    if(z <= 1000):
+                        depthData.append([[x*pixel_to_millimeter,y*pixel_to_millimeter,z]])
+
         point_3d_not_rotated.append(depthData)
     print("Process Finished!")
     return point_3d_not_rotated
 
-def rotation_of_axes_about_z(points_3d_not_rotated,degrees):
-    print("Rotating about z axis")
+def rotation_of_axes_about_y(points_3d_not_rotated,degrees):
+    print("Rotating about y axis")
     points_3d_rotated = []
     count = 0
     for i in points_3d_not_rotated:
@@ -87,6 +102,7 @@ def rotation_of_axes_about_z(points_3d_not_rotated,degrees):
             points_3d_rotated.append([x_rotated,y,z_rotated])
         count+=1
     print("Process Finished")
+    points_3d_rotated = np.array(points_3d_rotated)
     return points_3d_rotated
 
 def create_mesh(points_3d):
@@ -113,42 +129,73 @@ def visualize_mesh(mesh):
     # Visualize the mesh
     o3d.visualization.draw_geometries([mesh])
 
-
-if __name__ == "__main__":
-
-    #Contants
+def process(images,baseline,focal_length,pixel_to_millimeter,error,degrees):
+    po = get_depth_data(images,baseline,focal_length,pixel_to_millimeter)
+    coordinates = []
     
-    images_folder = './images6'
+    for i in po:
+        for j in i:
+            x = j[0][0]
+            y = j[0][1]
+            z = j[0][2] 
+            coordinates.append([x,y,z])
+    
+    # Testing in 2D 
+    # plot_2d_points(np.array(coordinates))
+    coordinates = np.array(coordinates)
 
-    # This function downloads the images from cloudinary to the folder
-    # backend.get_image_from_cloudinary(images_folder)
-      
-    # Baseline = distance from the camera to the object in m
-    baseline = 1       
-    focal_length = 3.50168727e+03
+    
+    # change origin 
+    average_z = np.mean(coordinates[:, 2])
 
-    # Calibration for camera 
-    # calib_folder = './Chessboard9x6'
-    # calibcamera = read_images(calib_folder)
-    # camera_matrix, dist_coeffs = calibration.calibrate_camera(calibcamera)
-    # focal_length = camera_matrix[0][0]
+    for point in coordinates:
+        point[2] -= average_z
+    
 
+    
+    corrected_coordinates = filter_3d_coordinates(coordinates,error)
+    
+    count=0
+    new=[] #filtered in po shape
+    
+    mode_z = mode(coordinates[:, 2]).mode
+    for i in po:
+        part=[]
+        for j in i:
+            z = coordinates[count][2]
+            if abs(z - mode_z) <= error:
+                part.append([[j[0][0],j[0][1]*3.33,z]])      
+            j[0][2] = coordinates[count][2]
+            count+=1
+        new.append(part)
 
-    # Main process start here .... 
-    images = read_images(images_folder)
-    points_3d_rotated = np.array(rotation_of_axes_about_z(get_depth_data(images,baseline,focal_length),5))
-    reconstructed_mesh = create_mesh(points_3d_rotated)
+    
+    # draw about origin
+    average_z = np.mean(corrected_coordinates[:, 2])             
 
-    visualize_mesh(reconstructed_mesh)
+    for i in new:
+        for j in i:
+            j[0][2] -= average_z
+    
+
+    points_rotated = rotation_of_axes_about_y(new,degrees)
+    return points_rotated
+
+def save_mesh(pointcloud,file_path):
+    #tessalation 
+    reconstructed_mesh = create_mesh(pointcloud)         
+    reconstructed_mesh.compute_vertex_normals()
+    visualize_mesh(reconstructed_mesh)               
+
     
     # Save as STL
     # o3d.io.write_triangle_mesh("bottle_mesh.stl", smoothed_mesh)
-    # o3d.io.write_triangle_mesh("mesh1.stl", reconstructed_mesh)
+    o3d.io.write_triangle_mesh(file_path, reconstructed_mesh)
 
-    # Upload to Cloudinary
-    # file_path = 'LinuxLogo.jpg'
-    # result = backend.upload_to_cloudinary(file_path)
-    # print(result)
+
+
+    
+    
 
 
 

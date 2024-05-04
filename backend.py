@@ -42,8 +42,8 @@ def download_image(url, folder_path):
     except Exception as e:
         print(f"Error downloading {url}: {e}")
 
-def get_image_from_cloudinary(images_folder):
-    project_name = 'YelpCamp' 
+def get_image_from_cloudinary(images_folder,project_name):
+    
     image_urls = get_cloudinary_image_urls(project_name)
 
     if(len(image_urls)==0):

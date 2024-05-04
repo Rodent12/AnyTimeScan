@@ -1,7 +1,9 @@
 import calibration
 import backend
+import parse
 import main
 import numpy as np
+
 
 
 
@@ -12,14 +14,18 @@ if __name__ == "__main__":
     images_folder = "./images6"
 
     # Download from Cloudinary
-    # project_name = 'YelpCamp' 
+    # Get degrees and project_name
+    # project_name,number_of_images_in_one_rotation = parse.parser()
+    # backend.get_image_from_cloudinary(images_folder,project_name)
     # backend.get_image_from_cloudinary(calib_folder,project_name_1)
-    # backend.get_image_from_cloudinary(images_folder,project_name_2)
+
+    
 
     #constants
     baseline = 50  
     sensor_size_mm = 7.7 
     error = 10
+    # degrees = 360/int(number_of_images_in_one_rotation)
     degrees = 5
     stl_file_path = "mesh2.stl"
 

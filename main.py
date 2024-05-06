@@ -41,10 +41,10 @@ def read_images_removebg(folder_path):
     for file_path in file_list:
         print("Image",cnt)
         img = cv2.imread(file_path)
-        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        # img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
         output = remove(img)
         img = cv2.cvtColor(output,cv2.COLOR_BGR2GRAY)
-        images.append(img)
+        images.append(output)
         cnt+=1
     print("Finished!")
     return images
@@ -70,7 +70,7 @@ def get_depth_data(images,baseline,focal_length,pixel_to_millimeter):
         optical_flow = calculate_dense_optical_flow(frame1, frame2)  
 
         h, w = optical_flow.shape[:2]
-        step = 5
+        step = 10
         depthData = []
         for y in range(0, h, step):
             for x in range(0, w, step):
@@ -164,7 +164,7 @@ def process(images,baseline,focal_length,pixel_to_millimeter,error,degrees):
         for j in i:
             z = coordinates[count][2]
             if abs(z - mode_z) <= error:
-                part.append([[j[0][0],j[0][1]*3.33,z]])      
+                part.append([[j[0][0]*1.2,j[0][1]*5,z]])      
             j[0][2] = coordinates[count][2]
             count+=1
         new.append(part)
@@ -180,7 +180,7 @@ def process(images,baseline,focal_length,pixel_to_millimeter,error,degrees):
 
     points_rotated = rotation_of_axes_about_y(new,degrees)
     return points_rotated
-
+'''
 def save_mesh(pointcloud,file_path):
     #tessalation 
     reconstructed_mesh = create_mesh(pointcloud)         
@@ -191,7 +191,40 @@ def save_mesh(pointcloud,file_path):
     # Save as STL
     # o3d.io.write_triangle_mesh("bottle_mesh.stl", smoothed_mesh)
     o3d.io.write_triangle_mesh(file_path, reconstructed_mesh)
+'''
 
+
+def save_mesh(pointcloud, file_path, smooth=True, solidity=True):
+    # Create mesh
+    reconstructed_mesh = create_mesh(pointcloud)
+    
+    # Compute vertex normals
+    # reconstructed_mesh.compute_vertex_normals()
+    
+    # Visualize mesh before modifications
+    # visualize_mesh(reconstructed_mesh)
+    
+    # Smoothing the mesh if requested
+    if smooth:
+        reconstructed_mesh = reconstructed_mesh.filter_smooth_laplacian(100)
+        
+    #     # Visualize mesh after smoothing
+    #     # visualize_mesh(reconstructed_mesh)
+    reconstructed_mesh.compute_vertex_normals()
+    # point_cloud = o3d.geometry.PointCloud()
+    # point_cloud.points = reconstructed_mesh.vertices
+    # point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=20000, max_nn=1000))
+
+    # # Solidifying the mesh if requested
+    # if solidity:
+    #     reconstructed_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(point_cloud,
+    #                                                                                           o3d.utility.DoubleVector([0.02, 0.04]))
+                                                                                              
+    #     # Visualize mesh after solidifying
+    #     visualize_mesh(reconstructed_mesh)
+    # visualize_mesh(reconstructed_mesh)
+    # Save the modified mesh
+    o3d.io.write_triangle_mesh(file_path, reconstructed_mesh)
 
 
     

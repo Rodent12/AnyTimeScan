@@ -16,7 +16,7 @@ cloudinary.config(
 
 def get_cloudinary_image_urls(project_name):
     try:
-        image_data = cloudinary.api.resources(type='upload', prefix=project_name, max_results=500)
+        image_data = cloudinary.api.resources(type='upload', prefix="files"+"/"+project_name, max_results=500)
         image_data = image_data["resources"]
         urls = [item['url'] for item in image_data]
         return urls
@@ -27,7 +27,7 @@ def download_image(url, folder_path):
     try:
         # Send an HTTP request to the URL
         response = requests.get(url)
-        
+
         # Ensure the request was successful (status code 200)
         if response.status_code == 200:
             # Extract the filename from the URL
@@ -45,7 +45,7 @@ def download_image(url, folder_path):
 def get_image_from_cloudinary(images_folder,project_name):
     
     image_urls = get_cloudinary_image_urls(project_name)
-
+    
     if(len(image_urls)==0):
         print("No image found")
 

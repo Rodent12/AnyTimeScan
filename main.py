@@ -180,19 +180,6 @@ def process(images,baseline,focal_length,pixel_to_millimeter,error,degrees):
 
     points_rotated = rotation_of_axes_about_y(new,degrees)
     return points_rotated
-'''
-def save_mesh(pointcloud,file_path):
-    #tessalation 
-    reconstructed_mesh = create_mesh(pointcloud)         
-    reconstructed_mesh.compute_vertex_normals()
-    visualize_mesh(reconstructed_mesh)               
-
-    
-    # Save as STL
-    # o3d.io.write_triangle_mesh("bottle_mesh.stl", smoothed_mesh)
-    o3d.io.write_triangle_mesh(file_path, reconstructed_mesh)
-'''
-
 
 def save_mesh(pointcloud, file_path, smooth=True, solidity=True):
     # Create mesh
